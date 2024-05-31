@@ -11,15 +11,15 @@
 (defroutes app-routes
            (GET "/:id" [id]
              (if (valid-telegram-id? id)
-               (if-let [value (redis/get-value id)]
+               (if-let [value (redis/pop-value id)]
                  (response {:ip value})
                  (-> (response {:error "Telegram ID not found"}) (status 404)))
                (-> (response {:error "Invalid Telegram ID"}) (status 400))))
            (POST "/:id" [id :as {body :body}]
              (if (valid-telegram-id? id)
                (if-let [ip (get body "ip")]
-                 (let [existing-value (redis/get-value id)]
-                   (redis/set-value id ip)
+                 (let [existing-value (redis/pop-value id)]
+                   (redis/put-value id ip)
                    (if existing-value
                      (-> (response {:answer "Value updated"}) (status 200))
                      (-> (response {:answer "New value created"}) (status 201))))

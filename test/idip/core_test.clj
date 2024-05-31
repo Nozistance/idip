@@ -4,24 +4,27 @@
             [idip.redis :as redis]
             [ring.mock.request :as mock]))
 
+(defonce state (atom {:value "mocked-value"}))
+
 (use-fixtures
   :each (fn [f]
+          (reset! state {:value "mocked-value"})
           (with-redefs
-            [redis/get-value (fn [key]
-                               (when (not= key "0")
-                                 "mocked-value"))
-             redis/set-value (fn [_ _] nil)] (f))))
+            [redis/pop-value (fn [key]
+                               (when (= key "123")
+                                 (let [result (:value @state)]
+                                   (reset! state {:value nil})
+                                   result)))
+             redis/put-value (fn [_ _] nil)] (f))))
 
 (deftest test-get-value
   (testing "GET request with existing key"
     (let [response (app (mock/request :get "/123"))]
       (is (= (:status response) 200))
-      (is (= (:body response) "{\"ip\":\"mocked-value\"}"))))
-
-  (testing "GET request with unique key"
-    (let [response (app (mock/request :get "/1111"))]
-      (is (= (:status response) 200))
-      (is (= (:body response) "{\"ip\":\"mocked-value\"}"))))
+      (is (= (:body response) "{\"ip\":\"mocked-value\"}"))
+      (let [response2 (app (mock/request :get "/123"))]
+        (is (= (:status response2) 404))
+        (is (= (:body response2) "{\"error\":\"Telegram ID not found\"}")))))
 
   (testing "GET request with invalid Telegram ID"
     (let [response (app (mock/request :get "/abc"))]
