@@ -1,4 +1,4 @@
-{:paths ["src/clj" "resources" "test/clj"]
+{:paths ["src" "resources" "test"]
  :deps  {org.clojure/clojure     {:mvn/version "1.11.1"}
          ring/ring-json          {:mvn/version "0.5.1"}
          ring/ring-jetty-adapter {:mvn/version "1.9.4"}
