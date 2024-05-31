@@ -5,25 +5,27 @@
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.util.response :refer [response status]]))
 
-(defn valid-telegram-id? [id]
+(defn valid-id? [id]
   (re-matches #"\d+" id))
 
 (defroutes app-routes
            (GET "/:id" [id]
-             (if (valid-telegram-id? id)
-               (if-let [value (redis/pop-value id)]
-                 (response {:ip value})
+             (if (valid-id? id)
+               (if-let [ip (redis/get id)]
+                 (-> (response {:ip ip}) (status 200))
                  (-> (response {:error "Telegram ID not found"}) (status 404)))
                (-> (response {:error "Invalid Telegram ID"}) (status 400))))
            (POST "/:id" [id :as {body :body}]
-             (if (valid-telegram-id? id)
-               (if-let [ip (get body "ip")]
-                 (let [existing-value (redis/pop-value id)]
-                   (redis/put-value id ip)
-                   (if existing-value
-                     (-> (response {:answer "Value updated"}) (status 200))
-                     (-> (response {:answer "New value created"}) (status 201))))
-                 (-> (response {:error "IP address is required"}) (status 400)))
+             (if (valid-id? id)
+               (let [ip (get body "ip")
+                     old-ip (redis/put id ip)]
+                 (if ip
+                   (if old-ip
+                     (-> (response {:answer "ID:IP has been updated" :old-ip old-ip}) (status 200))
+                     (-> (response {:answer "New ID:IP has been added" :old-ip nil}) (status 201)))
+                   (if old-ip
+                     (-> (response {:answer "ID:IP has been removed" :old-ip old-ip}) (status 200))
+                     (-> (response {:error "No ID:IP to remove" :old-ip nil}) (status 404)))))
                (-> (response {:error "Invalid Telegram ID"}) (status 400))))
            (ANY "/" []
              (-> (response {:error "Root path. Please specify a Telegram ID."}) (status 400))))
